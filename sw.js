@@ -1,5 +1,5 @@
-// Bei jeder Änderung an index.html die Versionsnummer erhöhen (hier UND in index.html bei "v2.0")!
-const CACHE = "evak-2.0";
+// Bei jeder Änderung an index.html die Versionsnummer erhöhen (hier UND in index.html bei "v2.1")!
+const CACHE = "evak-2.1-r2";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "logo.png"];
 
 self.addEventListener("install", e => {

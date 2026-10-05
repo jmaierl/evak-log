@@ -48,19 +48,36 @@ td .x{background:#3a1d1b;border:1px solid var(--out);color:#ff7b72;font-size:15p
 #modal .row{display:flex;gap:8px}
 #modal button{flex:1;padding:14px;font-size:16px;border-radius:8px;border:none;color:#fff}
 #mNo{background:#444}#mYes{background:var(--out)}
+.cnt{cursor:pointer;border-radius:8px;padding:2px 0}
+.cnt:active{background:#2a2a2a}
+.cnt .l::after{content:" ✎"}
+.est{color:#f5c518 !important}
+.sub{display:block;font-size:12px;font-weight:600;color:#f5c518;line-height:1.1}
+.total .sub{display:inline;font-size:15px;margin-left:6px}
+td.d-k{color:#f5c518}
+#setModal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+#setModal .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;max-width:360px;width:100%}
+#setModal p{margin:0 0 12px;white-space:pre-line}
+#sVal{width:100%;font-size:32px;font-weight:700;padding:10px;border-radius:8px;border:1px solid var(--line);background:#000;color:var(--fg);text-align:center;margin-bottom:12px}
+.chk{display:flex;align-items:center;gap:10px;font-size:17px;margin-bottom:14px}
+.chk input{width:24px;height:24px}
+#sCom{width:100%;padding:12px;font-size:16px;border-radius:8px;border:1px solid var(--line);background:#000;color:var(--fg);margin-bottom:14px}
+#setModal .row{display:flex;gap:8px}
+#setModal button{flex:1;padding:14px;font-size:16px;border-radius:8px;border:none;color:#fff}
+#sNo{background:#444}#sOk{background:#9a7400}
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#333;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none}
 </style>
 </head>
 <body>
 <div class="banner"><img class="logo" src="logo.png" alt="Bezirks-Feuerwehrverband Imst"><span class="lf">LAGEFÜHRUNG</span></div>
-<h1><span>Evakuierungsprotokoll <small class="ver">v2.0</small></span> <span id="clock"></span></h1>
+<h1><span>Evakuierungsprotokoll <small class="ver">v2.1</small></span> <span id="clock"></span></h1>
 
 <div class="totals">
   <div class="total"><span>Helfer im Einsatzbereich</span><b id="total">0</b></div>
   <div class="total pat"><span>Patienten evakuiert</span><b id="evac">0</b></div>
 </div>
 
-<input id="name" placeholder="Name / Kennung (optional)" autocomplete="off">
+<input id="name" placeholder="Kommentar (optional)" autocomplete="off">
 
 <div id="groups"></div>
 
@@ -71,11 +88,12 @@ td .x{background:#3a1d1b;border:1px solid var(--out);color:#ff7b72;font-size:15p
 </div>
 
 <table>
-  <thead><tr><th>#</th><th>Datum/Zeit</th><th>Gruppe</th><th>Richtung</th><th>Name</th><th></th></tr></thead>
+  <thead><tr><th>#</th><th>Datum/Zeit</th><th>Gruppe</th><th>Richtung</th><th>Kommentar</th><th></th></tr></thead>
   <tbody id="log"></tbody>
 </table>
 
 <div id="toast"></div>
+<div id="setModal"><div class="box"><p id="sText"></p><input id="sVal" type="number" inputmode="numeric" min="0" step="1"><label class="chk"><input type="checkbox" id="sEst" checked> geschätzt (ca.)</label><input id="sCom" type="text" placeholder="Kommentar, z. B. lt. Funk EL" autocomplete="off"><div class="row"><button id="sNo">Abbrechen</button><button id="sOk">Übernehmen</button></div></div></div>
 <div id="modal"><div class="box"><p id="mText"></p><div class="row"><button id="mNo">Abbrechen</button><button id="mYes">Löschen</button></div></div></div>
 
 <script>
@@ -96,11 +114,11 @@ function buildGroups(){
   c.innerHTML=GROUPS.map((g,i)=>g==="Patient"?`
     <div class="grp single">
       <button class="pbtn" onclick="add(${i},'Raus')">Patient evakuiert ◀ raus</button>
-      <div class="cnt"><span class="n" id="c${i}">0</span><span class="l">evakuiert</span></div>
+      <div class="cnt" onclick="setCount(${i})"><span class="n" id="c${i}">0</span><span class="l">evakuiert</span></div>
     </div>`:`
     <div class="grp">
       <button class="in" onclick="add(${i},'Rein')">${g} ▶ rein</button>
-      <div class="cnt"><span class="n" id="c${i}">0</span><span class="l">im Bereich</span></div>
+      <div class="cnt" onclick="setCount(${i})"><span class="n" id="c${i}">0</span><span class="l">im Bereich</span></div>
       <button class="out" onclick="add(${i},'Raus')">◀ raus</button>
     </div>`).join("");
 }
@@ -123,11 +141,11 @@ function ask(text,onYes){
 function undo(){
   if(!data.length){toast("Keine Einträge");return}
   const e=data[data.length-1];
-  ask("Letzten Eintrag löschen?\n"+fmt(e.t)+" – "+e.g+" "+e.d+(e.n?" ("+e.n+")":""),()=>{data.pop();save();render();toast("Gelöscht")});
+  ask("Letzten Eintrag löschen?\n"+fmt(e.t)+" – "+e.g+" "+desc(e)+(e.n?" ("+e.n+")":""),()=>{data.pop();save();render();toast("Gelöscht")});
 }
 function del(idx){
   const e=data[idx];
-  ask("Eintrag #"+(idx+1)+" löschen?\n"+fmt(e.t)+" – "+e.g+" "+e.d+(e.n?" ("+e.n+")":""),()=>{data.splice(idx,1);save();render();toast("Gelöscht")});
+  ask("Eintrag #"+(idx+1)+" löschen?\n"+fmt(e.t)+" – "+e.g+" "+desc(e)+(e.n?" ("+e.n+")":""),()=>{data.splice(idx,1);save();render();toast("Gelöscht")});
 }
 function resetAll(){
   if(!data.length){toast("Keine Einträge");return}
@@ -136,8 +154,10 @@ function resetAll(){
 function exportCSV(){
   if(!data.length){toast("Keine Daten");return}
   const esc=s=>'"'+String(s).replace(/"/g,'""')+'"';
-  const rows=[["Nr","Datum/Zeit","Gruppe","Richtung","Name/Kennung"].join(";")];
-  data.forEach((e,i)=>rows.push([i+1,fmt(e.t),e.g,e.d,esc(e.n)].join(";")));
+  const rows=[["Nr","Datum/Zeit","Gruppe","Richtung","Änderung","Geschätzt","Kommentar"].join(";")];
+  data.forEach((e,i)=>{
+    const chg=e.d==="Rein"?1:e.d==="Raus"?(e.g==="Patient"?1:-1):e.k;
+    rows.push([i+1,fmt(e.t),e.g,esc(desc(e)),chg,e.d==="Korrektur"?(e.est?"ja":"nein"):"",esc(e.n)].join(";"))});
   rows.push("");rows.push("Stand im Einsatzbereich;"+fmt(Date.now()));
   GROUPS.filter(g=>g!=="Patient").forEach(g=>rows.push(g+";"+count(g)));
   rows.push("Helfer im Einsatzbereich gesamt;"+helpers());
@@ -149,21 +169,46 @@ function exportCSV(){
   a.download=`evakuierungsprotokoll_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.csv`;
   document.body.appendChild(a);a.click();a.remove();
 }
-function evacuated(){return data.filter(e=>e.g==="Patient"&&e.d==="Raus").length}
+function delta(e){return e.d==="Rein"?1:e.d==="Raus"?-1:(e.k||0)}
+function count(g){return data.reduce((s,e)=>e.g===g?s+delta(e):s,0)}
+function evacuated(){return data.reduce((s,e)=>e.g==="Patient"?s+(e.d==="Raus"?1:e.d==="Korrektur"?(e.k||0):0):s,0)}
+function current(g){return g==="Patient"?evacuated():count(g)}
 function helpers(){return GROUPS.filter(g=>g!=="Patient").reduce((s,g)=>s+count(g),0)}
-function count(g){return data.reduce((s,e)=>e.g===g?s+(e.d==="Rein"?1:-1):s,0)}
+function isEst(g){for(let k=data.length-1;k>=0;k--){const e=data[k];if(e.g===g&&e.d==="Korrektur")return !!e.est}return false}
+function helpersEst(){return GROUPS.some(g=>g!=="Patient"&&isEst(g))}
+function estBase(g){for(let k=data.length-1;k>=0;k--){const e=data[k];if(e.g===g&&e.d==="Korrektur")return e.est?e.auf:null}return null}
+function helpersBase(){return GROUPS.filter(g=>g!=="Patient").reduce((s,g)=>{const b=estBase(g);return b==null?s:s+b},0)}
+function subTxt(b){return b==null?"":'<small class="sub">(ca. '+b+')</small>'}
+function desc(e){return e.d==="Korrektur"?"Korrektur "+e.von+"→"+e.auf+(e.est?" (ca.)":""):e.d}
+function setCount(i){
+  const g=GROUPS[i],cur=current(g),m=document.getElementById("setModal"),v=document.getElementById("sVal"),est=document.getElementById("sEst"),com=document.getElementById("sCom"),nameEl=document.getElementById("name");
+  document.getElementById("sText").textContent=(g==="Patient"?"Patienten evakuiert setzen":"Bestand setzen: "+g)+"\nAktuell: "+(isEst(g)?"ca. ":"")+cur;
+  v.value=cur;est.checked=true;com.value=nameEl.value.trim();m.style.display="flex";setTimeout(()=>{v.focus();v.select()},50);
+  const close=()=>{m.style.display="none"};
+  const ok=()=>{
+    const n=parseInt(v.value,10);
+    if(isNaN(n)||n<0){toast("Bitte Zahl ≥ 0 eingeben");return}
+    if(n===cur&&est.checked===isEst(g)&&!com.value.trim()){close();return}
+    data.push({t:Date.now(),g:g,d:"Korrektur",k:n-cur,von:cur,auf:n,est:est.checked,n:com.value.trim()});
+    nameEl.value="";close();save();render();
+    toast(g+": "+cur+" → "+(est.checked?"ca. ":"")+n);
+  };
+  document.getElementById("sNo").onclick=close;
+  document.getElementById("sOk").onclick=ok;
+  v.onkeydown=com.onkeydown=e=>{if(e.key==="Enter")ok()};
+}
 
 function render(){
   let tot=0;
   GROUPS.forEach((g,i)=>{
     const el=document.getElementById("c"+i);
-    if(g==="Patient"){el.textContent=evacuated();el.className="n";return}
-    const n=count(g);tot+=n;el.textContent=n;el.className="n"+(n<0?" neg":"")});
+    const n=current(g),es=isEst(g);if(g!=="Patient")tot+=n;
+    el.textContent=n;el.className="n"+(n<0?" neg":"")});
   const t=document.getElementById("total");t.textContent=tot;t.className=tot<0?"neg":"";
   document.getElementById("evac").textContent=evacuated();
   document.getElementById("log").innerHTML=data.map((e,i)=>({e,i})).reverse().map(({e,i})=>`
     <tr><td>${i+1}</td><td style="white-space:nowrap">${fmtLog(e.t)}</td><td>${e.g}</td>
-    <td class="${e.d==="Rein"?"d-in":"d-out"}">${e.d}</td>
+    <td class="${e.d==="Rein"?"d-in":e.d==="Raus"?"d-out":"d-k"}">${desc(e)}</td>
     <td>${e.n.replace(/</g,"&lt;")}</td>
     <td><button class="x" onclick="del(${i})">✕</button></td></tr>`).join("");
 }
