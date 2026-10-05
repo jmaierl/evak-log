@@ -12,8 +12,12 @@
 :root{--bg:#111;--fg:#eee;--card:#1c1c1c;--line:#333;--in:#1f8f3a;--out:#b3261e;--muted:#999}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:12px}
-h1{font-size:18px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
-#clock{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:400}
+h1{font-size:18px;margin:0 0 8px;display:flex;flex-wrap:wrap;gap:2px 12px;justify-content:space-between;align-items:center}
+.banner{background:#fff;margin:-12px -12px 12px;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.logo{height:40px;width:auto;display:block}
+.lf{color:#e30613;font-weight:800;font-size:20px;letter-spacing:.5px}
+.ver{font-size:12px;color:var(--muted);font-weight:400}
+#clock{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:400;font-size:15px;white-space:pre}
 .total{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .total b{font-size:28px}
 .totals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
@@ -48,10 +52,11 @@ td .x{background:#3a1d1b;border:1px solid var(--out);color:#ff7b72;font-size:15p
 </style>
 </head>
 <body>
-<h1>Evakuierungsprotokoll <span id="clock"></span></h1>
+<div class="banner"><img class="logo" src="logo.png" alt="Bezirks-Feuerwehrverband Imst"><span class="lf">LAGEFÜHRUNG</span></div>
+<h1><span>Evakuierungsprotokoll <small class="ver">v2.0</small></span> <span id="clock"></span></h1>
 
 <div class="totals">
-  <div class="total"><span>Helfer im Tunnel</span><b id="total">0</b></div>
+  <div class="total"><span>Helfer im Einsatzbereich</span><b id="total">0</b></div>
   <div class="total pat"><span>Patienten evakuiert</span><b id="evac">0</b></div>
 </div>
 
@@ -66,7 +71,7 @@ td .x{background:#3a1d1b;border:1px solid var(--out);color:#ff7b72;font-size:15p
 </div>
 
 <table>
-  <thead><tr><th>#</th><th>Zeit</th><th>Gruppe</th><th>Richtung</th><th>Name</th><th></th></tr></thead>
+  <thead><tr><th>#</th><th>Datum/Zeit</th><th>Gruppe</th><th>Richtung</th><th>Name</th><th></th></tr></thead>
   <tbody id="log"></tbody>
 </table>
 
@@ -82,6 +87,7 @@ try{data=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){data=[]}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){toast("⚠ Speichern im Browser fehlgeschlagen – CSV exportieren!")}}
 function pad(n){return String(n).padStart(2,"0")}
 function fmt(ts){const d=new Date(ts);return pad(d.getDate())+"."+pad(d.getMonth()+1)+"."+d.getFullYear()+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())}
+function fmtLog(ts){const d=new Date(ts);return pad(d.getDate())+"."+pad(d.getMonth()+1)+"."+String(d.getFullYear()).slice(-2)+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())}
 function fmtShort(ts){const d=new Date(ts);return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())}
 function toast(t){const el=document.getElementById("toast");el.textContent=t;el.style.opacity=1;clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity=0,1500)}
 
@@ -94,7 +100,7 @@ function buildGroups(){
     </div>`:`
     <div class="grp">
       <button class="in" onclick="add(${i},'Rein')">${g} ▶ rein</button>
-      <div class="cnt"><span class="n" id="c${i}">0</span><span class="l">im Tunnel</span></div>
+      <div class="cnt"><span class="n" id="c${i}">0</span><span class="l">im Bereich</span></div>
       <button class="out" onclick="add(${i},'Raus')">◀ raus</button>
     </div>`).join("");
 }
@@ -132,9 +138,9 @@ function exportCSV(){
   const esc=s=>'"'+String(s).replace(/"/g,'""')+'"';
   const rows=[["Nr","Datum/Zeit","Gruppe","Richtung","Name/Kennung"].join(";")];
   data.forEach((e,i)=>rows.push([i+1,fmt(e.t),e.g,e.d,esc(e.n)].join(";")));
-  rows.push("");rows.push("Stand im Tunnel;"+fmt(Date.now()));
+  rows.push("");rows.push("Stand im Einsatzbereich;"+fmt(Date.now()));
   GROUPS.filter(g=>g!=="Patient").forEach(g=>rows.push(g+";"+count(g)));
-  rows.push("Helfer im Tunnel gesamt;"+helpers());
+  rows.push("Helfer im Einsatzbereich gesamt;"+helpers());
   rows.push("Patienten evakuiert;"+evacuated());
   const blob=new Blob(["\uFEFF"+rows.join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");
@@ -156,12 +162,14 @@ function render(){
   const t=document.getElementById("total");t.textContent=tot;t.className=tot<0?"neg":"";
   document.getElementById("evac").textContent=evacuated();
   document.getElementById("log").innerHTML=data.map((e,i)=>({e,i})).reverse().map(({e,i})=>`
-    <tr><td>${i+1}</td><td>${fmtShort(e.t)}</td><td>${e.g}</td>
+    <tr><td>${i+1}</td><td style="white-space:nowrap">${fmtLog(e.t)}</td><td>${e.g}</td>
     <td class="${e.d==="Rein"?"d-in":"d-out"}">${e.d}</td>
     <td>${e.n.replace(/</g,"&lt;")}</td>
     <td><button class="x" onclick="del(${i})">✕</button></td></tr>`).join("");
 }
-setInterval(()=>{const d=new Date();document.getElementById("clock").textContent=pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())},1000);
+const WD=["So","Mo","Di","Mi","Do","Fr","Sa"];
+function tick(){const d=new Date();document.getElementById("clock").textContent=WD[d.getDay()]+", "+pad(d.getDate())+"."+pad(d.getMonth()+1)+"."+d.getFullYear()+"  "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())}
+tick();setInterval(tick,1000);
 buildGroups();render();
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(e=>console.warn("SW",e)))}
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
